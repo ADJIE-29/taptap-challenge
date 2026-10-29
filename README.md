@@ -1,2 +1,544 @@
 # taptap-challenge
 A simple and addictive 10-second tap clicker game for Android
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Tap Tap Challenge!</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Custom Styling & Mobile Tap Guards */
+    body {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Glow Effects */
+    .neon-glow-cyan {
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.5), inset 0 0 15px rgba(6, 182, 212, 0.3);
+    }
+    
+    .neon-glow-emerald {
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.6);
+    }
+
+    .neon-text-cyan {
+      text-shadow: 0 0 12px rgba(6, 182, 212, 0.7);
+    }
+
+    /* Animations */
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-80px) scale(1.4);
+      }
+    }
+
+    .floating-text {
+      position: absolute;
+      animation: floatUp 0.8s ease-out forwards;
+      pointer-events: none;
+      font-weight: 800;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.03); filter: brightness(1.2); }
+    }
+
+    .pulse-animation {
+      animation: pulseGlow 1.8s infinite ease-in-out;
+    }
+
+    /* Custom Scrollbar for Shop */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-cyan-500 selection:text-black">
+
+  <!-- TOP HEADER & STATS -->
+  <header class="w-full max-w-md mx-auto p-4 flex flex-col items-center z-10">
+    <div class="w-full flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-bolt text-cyan-400 text-xl"></i>
+        <h1 class="text-xl font-black tracking-wider uppercase bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+          Tap Tap!
+        </h1>
+      </div>
+      <button id="soundToggle" class="bg-slate-800 hover:bg-slate-700 text-slate-300 w-10 h-10 rounded-full flex items-center justify-center transition-all border border-slate-700">
+        <i class="fa-solid fa-volume-high" id="soundIcon"></i>
+      </button>
+    </div>
+
+    <!-- Mode Selector Tabs -->
+    <div class="grid grid-cols-2 gap-2 w-full p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-semibold">
+      <button id="modeFreeBtn" onclick="switchMode('free')" class="py-2 rounded-lg transition-all bg-cyan-500 text-slate-950 font-bold shadow-md">
+        <i class="fa-solid fa-infinity mr-1"></i> Endless Mode
+      </button>
+      <button id="modeTimeBtn" onclick="switchMode('timed')" class="py-2 rounded-lg transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-stopwatch mr-1"></i> 10s Challenge
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN GAME CANVAS & DISPLAY AREA -->
+  <main class="w-full max-w-md mx-auto px-4 flex-1 flex flex-col items-center justify-center relative">
+    
+    <!-- Score Dashboard -->
+    <div class="text-center my-2">
+      <div class="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-1">Score</div>
+      <div id="scoreDisplay" class="text-5xl font-black text-white neon-text-cyan tracking-tight">0</div>
+      <div id="cpsDisplay" class="text-xs text-emerald-400 font-medium mt-1">Per Tap: +1 | Auto: 0/s</div>
+    </div>
+
+    <!-- Timed Mode Status Display (Hidden in Free mode) -->
+    <div id="timedModeBox" class="hidden w-full bg-slate-900/80 border border-slate-800 rounded-xl p-3 mb-4 flex justify-between items-center backdrop-blur-sm">
+      <div class="text-center flex-1 border-r border-slate-800">
+        <span class="text-xs text-slate-400 block">Time Left</span>
+        <span id="timerDisplay" class="text-2xl font-bold text-amber-400">10.0s</span>
+      </div>
+      <div class="text-center flex-1">
+        <span class="text-xs text-slate-400 block">High Score</span>
+        <span id="highScoreDisplay" class="text-2xl font-bold text-emerald-400">0</span>
+      </div>
+    </div>
+
+    <!-- MAIN TAP BUTTON -->
+    <div class="relative my-6 flex items-center justify-center w-full max-w-[280px] aspect-square">
+      <!-- Outer Decorative Rings -->
+      <div class="absolute inset-0 rounded-full border-2 border-cyan-500/20 animate-ping opacity-30 pointer-events-none"></div>
+      <div class="absolute inset-[-12px] rounded-full border border-emerald-500/20 pointer-events-none"></div>
+
+      <!-- Interactive Tap Button -->
+      <button id="tapBtn" class="w-full h-full rounded-full bg-gradient-to-tr from-cyan-600 via-emerald-500 to-cyan-400 neon-glow-cyan active:scale-95 transition-transform duration-75 flex flex-col items-center justify-center cursor-pointer border-4 border-slate-900 relative overflow-hidden group shadow-2xl">
+        <i class="fa-solid fa-hand-pointer text-5xl text-slate-950 mb-1 group-hover:scale-110 transition-transform"></i>
+        <span class="text-slate-950 font-black text-2xl uppercase tracking-wider">TAP!</span>
+      </button>
+
+      <!-- Overlay overlay for Challenge Mode START -->
+      <div id="challengeStartOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md rounded-full flex flex-col items-center justify-center p-4 border border-cyan-500/40 z-20">
+        <p class="text-center text-xs font-semibold text-slate-300 mb-2">Tap as fast as you can in 10 seconds!</p>
+        <button id="startChallengeBtn" class="bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black px-6 py-3 rounded-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-wider">
+          <i class="fa-solid fa-play mr-1"></i> Start Game
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- UPGRADES SHOP SECTION -->
+  <footer class="w-full max-w-md mx-auto p-4 bg-slate-900/90 border-t border-slate-800 rounded-t-3xl backdrop-blur-lg">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+        <i class="fa-solid fa-cart-shopping text-cyan-400"></i> Upgrades & Boosts
+      </h2>
+      <button id="resetDataBtn" class="text-[10px] text-slate-500 hover:text-rose-400 transition-colors">
+        Reset Progress
+      </button>
+    </div>
+
+    <!-- Shop List Container -->
+    <div class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+      
+      <!-- Upgrade Item 1: Tap Power -->
+      <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-800/50 flex items-center justify-center text-cyan-400 text-lg">
+            <i class="fa-solid fa-hand-fist"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-200">Stronger Fingers</div>
+            <div class="text-[10px] text-slate-400">+1 Point Per Tap</div>
+          </div>
+        </div>
+        <button id="buyTapPowerBtn" class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-700 flex flex-col items-end">
+          <span class="text-emerald-400"><i class="fa-solid fa-coins mr-1"></i><span id="tapPowerCost">10</span></span>
+          <span class="text-[9px] text-slate-400 font-normal">Lvl <span id="tapPowerLvl">1</span></span>
+        </button>
+      </div>
+
+      <!-- Upgrade Item 2: Auto Clicker -->
+      <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-emerald-400 text-lg">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-200">Auto Bot</div>
+            <div class="text-[10px] text-slate-400">+1 Tap / Sec Automatically</div>
+          </div>
+        </div>
+        <button id="buyAutoClickerBtn" class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-slate-700 flex flex-col items-end">
+          <span class="text-emerald-400"><i class="fa-solid fa-coins mr-1"></i><span id="autoClickerCost">50</span></span>
+          <span class="text-[9px] text-slate-400 font-normal">Lvl <span id="autoClickerLvl">0</span></span>
+        </button>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- CUSTOM RESULT MODAL FOR TIMED MODE -->
+  <div id="resultModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl relative">
+      <div class="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-950 text-2xl font-black">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h3 class="text-xl font-black text-white mb-1">Time's Up!</h3>
+      <p class="text-xs text-slate-400 mb-4">You tapped like a pro!</p>
+      
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 mb-4 space-y-1">
+        <div class="text-xs text-slate-400">Total Taps: <span id="modalTaps" class="text-white font-bold">0</span></div>
+        <div class="text-xs text-slate-400">Taps/Sec (CPS): <span id="modalCPS" class="text-cyan-400 font-bold">0</span></div>
+        <div id="newHighscoreBadge" class="hidden text-[10px] font-bold text-emerald-400 uppercase tracking-widest pt-1">
+          🎉 New High Score! 🎉
+        </div>
+      </div>
+
+      <button id="closeModalBtn" class="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2.5 rounded-xl transition-all text-sm uppercase tracking-wider">
+        Play Again
+      </button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT GAME LOGIC -->
+  <script>
+    // -----------------------------------------------------------------
+    // GAME STATE & CONSTANTS
+    // -----------------------------------------------------------------
+    let score = 0;
+    let pointsPerTap = 1;
+    let autoClickerRate = 0; // Taps added per second
+    let soundEnabled = true;
+
+    // Upgrades Costs & Levels
+    let tapPowerLevel = 1;
+    let tapPowerCost = 10;
+    
+    let autoClickerLevel = 0;
+    let autoClickerCost = 50;
+
+    // Timed Mode State
+    let currentMode = 'free'; // 'free' or 'timed'
+    let timer = 10.0;
+    let timerInterval = null;
+    let gameActive = true;
+    let timedTapsCount = 0;
+    let highScore = localStorage.getItem('taptap_highscore') ? parseInt(localStorage.getItem('taptap_highscore')) : 0;
+
+    // -----------------------------------------------------------------
+    // WEB AUDIO API (Synthetic SFX without external dependencies)
+    // -----------------------------------------------------------------
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      initAudio();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'tap') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300 + Math.random() * 150, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'buy') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(880, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'over') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // DOM ELEMENTS
+    // -----------------------------------------------------------------
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const cpsDisplay = document.getElementById('cpsDisplay');
+    const tapBtn = document.getElementById('tapBtn');
+    
+    // Shop Elements
+    const buyTapPowerBtn = document.getElementById('buyTapPowerBtn');
+    const tapPowerCostEl = document.getElementById('tapPowerCost');
+    const tapPowerLvlEl = document.getElementById('tapPowerLvl');
+    
+    const buyAutoClickerBtn = document.getElementById('buyAutoClickerBtn');
+    const autoClickerCostEl = document.getElementById('autoClickerCost');
+    const autoClickerLvlEl = document.getElementById('autoClickerLvl');
+    
+    // Mode Elements
+    const modeFreeBtn = document.getElementById('modeFreeBtn');
+    const modeTimeBtn = document.getElementById('modeTimeBtn');
+    const timedModeBox = document.getElementById('timedModeBox');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const challengeStartOverlay = document.getElementById('challengeStartOverlay');
+    const startChallengeBtn = document.getElementById('startChallengeBtn');
+
+    // Modal
+    const resultModal = document.getElementById('resultModal');
+    const modalTaps = document.getElementById('modalTaps');
+    const modalCPS = document.getElementById('modalCPS');
+    const newHighscoreBadge = document.getElementById('newHighscoreBadge');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+
+    // Audio & Reset
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const resetDataBtn = document.getElementById('resetDataBtn');
+
+    // -----------------------------------------------------------------
+    // CORE FUNCTIONS
+    // -----------------------------------------------------------------
+
+    // Update UI elements
+    function updateUI() {
+      scoreDisplay.textContent = Math.floor(score).toLocaleString();
+      cpsDisplay.textContent = `Per Tap: +${pointsPerTap} | Auto: ${autoClickerRate}/s`;
+      
+      // Shop costs/levels
+      tapPowerCostEl.textContent = tapPowerCost;
+      tapPowerLvlEl.textContent = tapPowerLevel;
+      autoClickerCostEl.textContent = autoClickerCost;
+      autoClickerLvlEl.textContent = autoClickerLevel;
+
+      // Enable / Disable buttons based on points
+      buyTapPowerBtn.disabled = score < tapPowerCost;
+      buyAutoClickerBtn.disabled = score < autoClickerCost;
+
+      // High Score Display
+      highScoreDisplay.textContent = highScore;
+    }
+
+    // Handle Tapping
+    function handleTap(e) {
+      if (!gameActive) return;
+
+      score += pointsPerTap;
+      timedTapsCount += 1;
+      playSound('tap');
+      
+      // Create Floating text effect (+1)
+      createFloatingText(e, `+${pointsPerTap}`);
+      
+      updateUI();
+    }
+
+    // Create floating score indicators on click/tap
+    function createFloatingText(e, text) {
+      const el = document.createElement('div');
+      el.className = 'floating-text text-cyan-300 font-extrabold text-2xl drop-shadow-md z-30';
+      el.textContent = text;
+
+      // Calculate position relative to container
+      const rect = tapBtn.getBoundingClientRect();
+      let x = rect.left + rect.width / 2;
+      let y = rect.top + rect.height / 2;
+
+      // Use event position if available (mouse or touch)
+      if (e && e.clientX) {
+        x = e.clientX;
+        y = e.clientY;
+      } else if (e && e.touches && e.touches[0]) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      }
+
+      // Add slight random offset for visual flair
+      x += (Math.random() - 0.5) * 40;
+      y += (Math.random() - 0.5) * 20;
+
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+
+      document.body.appendChild(el);
+
+      setTimeout(() => {
+        el.remove();
+      }, 800);
+    }
+
+    // -----------------------------------------------------------------
+    // SHOP LOGIC
+    // -----------------------------------------------------------------
+    buyTapPowerBtn.addEventListener('click', () => {
+      if (score >= tapPowerCost) {
+        score -= tapPowerCost;
+        pointsPerTap += 1;
+        tapPowerLevel += 1;
+        tapPowerCost = Math.floor(tapPowerCost * 1.8);
+        playSound('buy');
+        updateUI();
+      }
+    });
+
+    buyAutoClickerBtn.addEventListener('click', () => {
+      if (score >= autoClickerCost) {
+        score -= autoClickerCost;
+        autoClickerRate += 1;
+        autoClickerLevel += 1;
+        autoClickerCost = Math.floor(autoClickerCost * 2.2);
+        playSound('buy');
+        updateUI();
+      }
+    });
+
+    // Auto-Clicker Loop (runs every 1 second)
+    setInterval(() => {
+      if (autoClickerRate > 0 && gameActive) {
+        score += autoClickerRate;
+        updateUI();
+      }
+    }, 1000);
+
+    // -----------------------------------------------------------------
+    // GAME MODES & TIMED CHALLENGE
+    // -----------------------------------------------------------------
+    function switchMode(mode) {
+      currentMode = mode;
+      clearInterval(timerInterval);
+
+      if (mode === 'free') {
+        gameActive = true;
+        modeFreeBtn.className = "py-2 rounded-lg transition-all bg-cyan-500 text-slate-950 font-bold shadow-md";
+        modeTimeBtn.className = "py-2 rounded-lg transition-all text-slate-400 hover:text-white";
+        timedModeBox.classList.add('hidden');
+        challengeStartOverlay.classList.add('hidden');
+      } else {
+        gameActive = false;
+        modeTimeBtn.className = "py-2 rounded-lg transition-all bg-emerald-500 text-slate-950 font-bold shadow-md";
+        modeFreeBtn.className = "py-2 rounded-lg transition-all text-slate-400 hover:text-white";
+        timedModeBox.classList.remove('hidden');
+        challengeStartOverlay.classList.remove('hidden');
+        timer = 10.0;
+        timerDisplay.textContent = timer.toFixed(1) + 's';
+      }
+    }
+
+    startChallengeBtn.addEventListener('click', () => {
+      challengeStartOverlay.classList.add('hidden');
+      score = 0;
+      timedTapsCount = 0;
+      timer = 10.0;
+      gameActive = true;
+      updateUI();
+
+      timerInterval = setInterval(() => {
+        timer -= 0.1;
+        if (timer <= 0) {
+          timer = 0;
+          endChallenge();
+        }
+        timerDisplay.textContent = timer.toFixed(1) + 's';
+      }, 100);
+    });
+
+    function endChallenge() {
+      clearInterval(timerInterval);
+      gameActive = false;
+      playSound('over');
+
+      const cps = (timedTapsCount / 10).toFixed(1);
+      modalTaps.textContent = timedTapsCount;
+      modalCPS.textContent = cps;
+
+      // High Score check
+      if (timedTapsCount > highScore) {
+        highScore = timedTapsCount;
+        localStorage.setItem('taptap_highscore', highScore);
+        newHighscoreBadge.classList.remove('hidden');
+      } else {
+        newHighscoreBadge.classList.add('hidden');
+      }
+
+      highScoreDisplay.textContent = highScore;
+      resultModal.classList.remove('hidden');
+    }
+
+    closeModalBtn.addEventListener('click', () => {
+      resultModal.classList.add('hidden');
+      switchMode('timed');
+    });
+
+    // -----------------------------------------------------------------
+    // SOUND & DATA RESET
+    // -----------------------------------------------------------------
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) {
+        soundIcon.className = "fa-solid fa-volume-high text-cyan-400";
+      } else {
+        soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+      }
+    });
+
+    resetDataBtn.addEventListener('click', () => {
+      if (confirm('Reset all scores, upgrades, and high scores?')) {
+        score = 0;
+        pointsPerTap = 1;
+        autoClickerRate = 0;
+        tapPowerLevel = 1;
+        tapPowerCost = 10;
+        autoClickerLevel = 0;
+        autoClickerCost = 50;
+        highScore = 0;
+        localStorage.removeItem('taptap_highscore');
+        updateUI();
+      }
+    });
+
+    // Tap Event Listener
+    tapBtn.addEventListener('pointerdown', handleTap);
+
+    // Initial Start
+    updateUI();
+  </script>
+</body>
+</html>
